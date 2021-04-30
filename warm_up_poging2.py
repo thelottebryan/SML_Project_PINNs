@@ -132,7 +132,5 @@ class PINN:
 layers = [10,10,10,1]   
 N = 50
 PINN_model = PINN(layers,N) 
-model = my_model(layers)
-#u = my_model.forward(10)
 losses = PINN_model.train()
 PINN_model.plot_solution()
