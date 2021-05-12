@@ -9,24 +9,18 @@ import matplotlib.pyplot as plt
 import os
 
 #%%
-class my_model(tf.Module):
-    def __init__(self,layers):
+   
+class PINN(object):
+    def __init__(self, layers, N, Nbc=[20,20,20,20], random=False,epochs=100,int_weight=1,bound_weight=1):
+        
         self.depth = len(layers)
         self.activation = tf.nn.tanh
         
-        self.model = tf.keras.Sequential()
-        
+        self.model = tf.keras.models.Sequential()
         self.model.add(tf.keras.Input(shape=2))
         for i in range(self.depth):
             self.model.add(tf.keras.layers.Dense(layers[i], activation=self.activation))
-    
-    def forward(self, x):
-        out = self.model(x)
-        return out
-    
-class PINN:
-    def __init__(self, layers, N, Nbc=[20,20,20,20], random=False,epochs=100,int_weight=1,bound_weight=1):
-        self.model = my_model(layers)
+        
         self.optimizer = tf.keras.optimizers.Adam(
                                           learning_rate=0.1,
                                           beta_1=0.99,
@@ -38,7 +32,10 @@ class PINN:
         self.epochs=epochs
         self.int_weight=int_weight
         self.bound_weight=bound_weight
-
+        
+        self.ckpt = tf.train.Checkpoint(step=tf.Variable(1), net = self.model)
+        self.manager = tf.train.CheckpointManager(self.ckpt, './tf_ckpts', max_to_keep=3)
+        self.ckpt.restore(self.manager.latest_checkpoint)
     
     def generate_train_data_grid(self):
         # Boundary
@@ -97,7 +94,7 @@ class PINN:
         return self.boundary, self.interior
     
     def u(self, x):
-        return self.model.forward(x)
+        return self.model.(x)
  
     def f(self, x):
         fun = np.zeros(len(x))
@@ -128,11 +125,13 @@ class PINN:
             grad_u_interior   = tape.gradient(u_interior, interior_tensor)
             u_interior_x      = grad_u_interior[:,0]
             u_interior_y      = grad_u_interior[:,1]
-            u_interior_xx = tape.gradient(u_interior_x, interior_tensor)[:,0]
-            u_interior_yy = tape.gradient(u_interior_y, interior_tensor)[:,1]
-            
-            diffusion     = tf.math.scalar_mul(-0.01,tf.math.add(u_interior_xx,u_interior_yy))
-            advection     = tf.math.add(tf.math.scalar_mul((0.5*np.sqrt(0.8)),u_interior_x),tf.math.scalar_mul(1 * np.sqrt(0.8),u_interior_y))
+        u_interior_xx = tape.gradient(u_interior_x, interior_tensor)[:,0]
+        u_interior_yy = tape.gradient(u_interior_y, interior_tensor)[:,1]
+        
+        del tape 
+        
+        diffusion     = tf.math.scalar_mul(-0.01,tf.math.add(u_interior_xx,u_interior_yy))
+        advection     = tf.math.add(tf.math.scalar_mul((0.5*np.sqrt(0.8)),u_interior_x),tf.math.scalar_mul(1 * np.sqrt(0.8),u_interior_y))
         
         f_values = self.f(interior_tensor)
         
@@ -163,6 +162,13 @@ class PINN:
             boundary_losses.append(self.boundary_loss.numpy())
             total_losses.append(self.total_loss.numpy())
             print('Run ',i)
+            
+            self.ckpt.step.assign_add(1)
+            if int(self.ckpt.step) % 10 == 0:
+                save_path = self.manager.save()
+                print("Saved checkpoint for step {}: {}".format(int(self.ckpt.step), save_path))
+                print("loss {:1.2f}".format(loss.numpy()))
+                
         return interior_losses, boundary_losses, total_losses
     
     def plot_solution(self):
@@ -172,7 +178,7 @@ class PINN:
         xx = tf.reshape(xx, [1,len(x)**2]) 
         yy = tf.reshape(yy, [1,len(x)**2])
         self.data = tf.cast( tf.transpose(tf.concat([xx,yy], axis=0)), tf.float32)
-        u = np.array(self.model.forward(self.data))
+        u = np.array(self.model(self.data))
         
         fig = plt.figure(figsize=(10,10))
         ax = fig.add_subplot(111)
