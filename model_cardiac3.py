@@ -70,12 +70,7 @@ class Eikonal2DnetCV2(object):
                                           learning_rate=0.1,
                                           beta_1=0.99,
                                           epsilon=1e-1)
-        # with tf.GradientTape() as tape:
-        #     loss = self.loss
-        #     var_list =  [self.weights, self.CVweights, self.biases, self.CVbiases]
-        # grads = tape.gradient(loss, var_list)
-        # self.optimizer_Adam.apply_gradients(zip(grads, var_list))
-        #self.train_op_Adam = self.optimizer_Adam.minimize(self.loss, var_list = [self.weights, self.CVweights, self.biases, self.CVbiases])
+      
         
         
         
@@ -174,10 +169,8 @@ class Eikonal2DnetCV2(object):
             del tape
             
             self.optimizer_Adam.apply_gradients(zip(grads, self.weights))
-            #self.optimizer_Adam.apply_gradients(zip(CVgrads, self.CVweights))
-            
-            # self.optimizer_Adam.minimize(self.loss(), var_list = [self.weights, self.CVweights, self.biases, self.CVbiases])
-            # self.lossit.append(loss_value)
+            self.optimizer_Adam.apply_gradients(zip(CVgrads, self.CVweights))
+           
             
             # Print
             if it % 10 == 0:
